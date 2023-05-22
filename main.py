@@ -45,28 +45,28 @@ def get_enemies(G, name):
 
     return list(enemies)
 
-# Ally of an ally is also an ally
+# Enemy of our enemy is our ally
 def predict_allies(G, name):
-    neighbors = set(G.neighbors(name))
     potential_allies = set()
 
-    for n in neighbors:
-        for u, v, k in G.edges(n, data=True):
-            if k['attr_dict']['relation_type'] == 'is allied with':
-                potential_allies.add(v)
+    for u, v, k in G.edges(name, data=True):
+        if k['attr_dict']['relation_type'] == 'is enemy of':
+            for a, b, c in G.edges(v, data=True):
+                if c['attr_dict']['relation_type'] == 'is enemy of':
+                    potential_allies.add(b)
 
     return list(potential_allies)
 
 # Enemy of an ally is also an enemy
 def predict_enemies(G, name):
-    neighbors = set(G.neighbors(name))
     potential_enemies = set()
 
-    for n in neighbors:
-        for u, v, k in G.edges(n, data=True):
-            if k['attr_dict']['relation_type'] == 'is enemy of':
-                potential_enemies.add(v)
-    
+    for u, v, k in G.edges(name, data=True):
+        if k['attr_dict']['relation_type'] == 'is allied with':
+            for a, b, c in G.edges(v, data=True):
+                if c['attr_dict']['relation_type'] == 'is enemy of':
+                    potential_enemies.add(b)
+        
     return list(potential_enemies)
 
 def cluster_network(G):
@@ -118,22 +118,27 @@ for relation in relations:
 #visualize(G)
 
 # Predict alliances
-character = 'Tywin Lannister'
+character = 'Arya Stark'
 
 # Do intersection with actual allies
 allies = get_allies(G, character)
 predicted_allies = predict_allies(G, character)
 correct_allies = set(allies).intersection(set(predicted_allies))
+
+print(f'Potential allies of {character}:')
+print(predicted_allies)
+
 print(f'Correct allies of {character}: {correct_allies}')
 print('Preicision: ', len(correct_allies) / len(predicted_allies))
-
-print(f'Potential enemies of {character}:')
-print(predict_enemies(G, character))
 
 # Do intersection with actual enemies
 enemies = get_enemies(G, character)
 predicted_enemies = predict_enemies(G, character)
 correct_enemies = set(enemies).intersection(set(predicted_enemies))
+
+print(f'Potential enemies of {character}:')
+print(predicted_enemies)
+
 print(f'Correct enemies of {character}: {correct_enemies}')
 print('Preicision: ', len(correct_enemies) / len(predicted_enemies))
 
