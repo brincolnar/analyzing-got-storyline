@@ -3,6 +3,27 @@ import json
 import matplotlib.pyplot as plt
 import community as community_louvain
 
+def build_graph(data):
+    # Create a directed graph
+    G = nx.DiGraph()
+
+    # Add nodes to the graph
+    characters = data['characters']
+
+    # Print how many characters there are
+    print(f'Number of characters: {len(characters)}')
+
+    for character in characters:
+        G.add_node(character['name'], attr_dict=character)
+
+    # Add edges to the graph
+    relations = data['relations']
+
+    for relation in relations:
+        G.add_edge(relation['source'], relation['target'], attr_dict=relation)
+
+    return G
+
 def visualize(G):
     # Draw the graph
     pos = nx.kamada_kawai_layout(G)  # compute graph layout
@@ -92,54 +113,95 @@ def cluster_network(G):
     plt.axis('off')
     plt.show()
 
+# Find unique houses
+def find_houses(data):
+    houses = set()
+    
+    for character in data['characters']:
+        houses.add(character['faction'])
+
+    return list(houses)
+
+def enemy_prediction(G, character):
+    # Do intersection with actual enemies
+    enemies = get_enemies(G, character)
+    predicted_enemies = predict_enemies(G, character)
+    correct_enemies = set(enemies).intersection(set(predicted_enemies))
+    print(f'Potential enemies of {character}:')
+    print(predicted_enemies)
+
+    print(f'Correct enemies of {character}: {correct_enemies}')
+    print('Preicision: ', len(correct_enemies) / len(predicted_enemies))
+
+def alliance_prediction(G, character):
+    # Do intersection with actual allies
+    allies = get_allies(G, character)
+    predicted_allies = predict_allies(G, character)
+    correct_allies = set(allies).intersection(set(predicted_allies))
+
+    print(f'Potential allies of {character}:')
+    print(predicted_allies)
+
+    print(f'Correct allies of {character}: {correct_allies}')
+    print('Preicision: ', len(correct_allies) / len(predicted_allies))
+
+# Get all characters for each house
+def get_house_characters(data):
+    houses = find_houses(data)
+    houses2characters = {}
+
+    for house in houses:
+        houses2characters[house] = []
+
+    for character in data['characters']:
+        houses2characters[character['faction']].append(character)
+
+    return houses2characters
+
+# Find which character is the most important for each of the houses
+def find_key_characters(G, data):
+    house2characters = get_house_characters(data)
+
+    degree_centrality = nx.degree_centrality(G) # number of edges
+    betweenness_centrality = nx.betweenness_centrality(G) # number of shortest paths through the node
+    eigenvector_centrality = nx.eigenvector_centrality(G) # takes into account the influence 
+
+    for house,character_list in house2characters.items():
+        # Character rankings
+        rankings = {
+            'degree_centrality': {},
+            'betweenness_centrality': {},
+            'eigenvector_centrality': {}
+        }
+
+        for character in character_list:
+            rankings['degree_centrality'][character["name"]] = degree_centrality[character["name"]] 
+            rankings['betweenness_centrality'][character["name"]] = betweenness_centrality[character["name"]] 
+            rankings['eigenvector_centrality'][character["name"]] = eigenvector_centrality[character["name"]] 
+
+        # Sort 
+        rankings_degree = {k: v for k, v in sorted(rankings['degree_centrality'].items(), key=lambda item: item[1], reverse=True)}
+        rankings_betweenness = {k: v for k, v in sorted(rankings['betweenness_centrality'].items(), key=lambda item: item[1], reverse=True)}
+        rankings_eigenvector = {k: v for k, v in sorted(rankings['eigenvector_centrality'].items(), key=lambda item: item[1], reverse=True)}
+        
+        print(f'{house}')
+        print('Degree centrality')
+        for k,v in rankings_degree.items():
+            print(f'{k}: {v}')
+        print("-------------------------------------")
+        print('Betweenness centrality')
+        for k,v in rankings_betweenness.items():
+            print(f'{k}: {v}')
+        print("-------------------------------------")
+        print('Eigenvector centrality')
+        for k,v in rankings_eigenvector.items():
+            print(f'{k}: {v}')
+        print("=====================================")
+
 # Load JSON data from a file
 with open('got.json') as f:
     data = json.load(f)
 
-# Create a directed graph
-G = nx.DiGraph()
+G = build_graph(data)
 
-# Add nodes to the graph
-characters = data['characters']
-
-# Print how many characters there are
-print(f'Number of characters: {len(characters)}')
-
-for character in characters:
-    G.add_node(character['name'], attr_dict=character)
-
-# Add edges to the graph
-relations = data['relations']
-
-for relation in relations:
-    G.add_edge(relation['source'], relation['target'], attr_dict=relation)
-
-# unique_relations(G)
-#visualize(G)
-
-# Predict alliances
-character = 'Arya Stark'
-
-# Do intersection with actual allies
-allies = get_allies(G, character)
-predicted_allies = predict_allies(G, character)
-correct_allies = set(allies).intersection(set(predicted_allies))
-
-print(f'Potential allies of {character}:')
-print(predicted_allies)
-
-print(f'Correct allies of {character}: {correct_allies}')
-print('Preicision: ', len(correct_allies) / len(predicted_allies))
-
-# Do intersection with actual enemies
-enemies = get_enemies(G, character)
-predicted_enemies = predict_enemies(G, character)
-correct_enemies = set(enemies).intersection(set(predicted_enemies))
-
-print(f'Potential enemies of {character}:')
-print(predicted_enemies)
-
-print(f'Correct enemies of {character}: {correct_enemies}')
-print('Preicision: ', len(correct_enemies) / len(predicted_enemies))
-
-# cluster_network(G)
+find_key_characters(G, data)
